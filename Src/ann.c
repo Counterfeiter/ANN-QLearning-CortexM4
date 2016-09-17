@@ -18,13 +18,14 @@ static void ann_getLEDsWithOld(fann_type *val);
 //source is ported from here -> http://outlace.com/Reinforcement-Learning-Part-3/
 void ann_start_qlearning(int epochs, float gamma, float epsilon)
 {
+#ifdef ANN_FEEDBACK_OUT_TO_IN
 	int num_inputs = 8;
+#else
+	int num_inputs = 4;
+#endif
 	int num_outputs = 4;
 	//create ann -> 1 hidden layer with 4 neurons
 	struct fann *ann = fann_create_standard(3, num_inputs, 12, num_outputs);
-
-	//could also be another alg.
-	fann_set_training_algorithm(ann, FANN_TRAIN_INCREMENTAL);
 
 	//stepwise is more then two times faster
 	//use symmetric to deal with -1.0 and 1.0 or normal for 0.0 to 1.0
@@ -136,12 +137,11 @@ void ann_start_qlearning(int epochs, float gamma, float epsilon)
 		//set the old values as train data (output) - use new max in equation
 		qval[action] = (reward < 0.0) ? (reward + (gamma * maxQ)) : reward;
 
-		//create new training data
-		struct fann_train_data *train = fann_create_train_array(1, num_inputs, old_in_p, num_outputs, qval);
-		//train ann
-		fann_train_epoch(ann, train);
-		//destroy training data -> could be more efficient implemented
-		fann_destroy_train(train);
+		//this function use always backpropagation algorithm!
+		//fann_set_training_algorithm has no effect!
+		//or same as fann_set_training_algorithm = incremental and train epoch
+		//train ann   , input, desired outputs
+		fann_train(ann, old_in_p, qval);
 
 		//switch pointer -> new data, to old data
 		fann_type *temp = old_in_p;
@@ -152,6 +152,16 @@ void ann_start_qlearning(int epochs, float gamma, float epsilon)
 		if(epsilon > 0.1)
 			epsilon -= ( 1.0 / epochs );
 	}
+
+	//mark that we go to the execution state
+	//set all LEDs
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 1);
+	HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, 1);
+	HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, 1);
+	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, 1);
+	HAL_Delay(500);
+
+	//fun fact... ann starts from unseen training data (all leds on)
 
 	//display pattern after training
 	//execute forever
@@ -177,7 +187,7 @@ void ann_start_qlearning(int epochs, float gamma, float epsilon)
 		//set next LED
 		ann_setLEDs(index);
 		//delay a bit
-		HAL_Delay(500);
+		HAL_Delay(100);
 	}
 }
 
@@ -208,10 +218,12 @@ static void ann_getLEDsWithOld(fann_type *val)
 	val[1] = HAL_GPIO_ReadPin(LD4_GPIO_Port, LD4_Pin) ? 1.0 : -1.0;
 	val[2] = HAL_GPIO_ReadPin(LD5_GPIO_Port, LD5_Pin) ? 1.0 : -1.0;
 	val[3] = HAL_GPIO_ReadPin(LD6_GPIO_Port, LD6_Pin) ? 1.0 : -1.0;
+#ifdef ANN_FEEDBACK_OUT_TO_IN
 	val[4] = old_led_state[0];
 	val[5] = old_led_state[1];
 	val[6] = old_led_state[2];
 	val[7] = old_led_state[3];
+#endif
 }
 
 //set LEDs and save state before

@@ -79,8 +79,11 @@ int main(void)
   MX_USART2_UART_Init();
 
   /* USER CODE BEGIN 2 */
-
-  ann_start_qlearning(100, 0.9, 1.0);
+#ifdef ANN_FEEDBACK_OUT_TO_IN
+  ann_start_qlearning(75, 0.9, 1.0);
+#else
+  ann_start_qlearning(10, 0.9, 1.0);
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
